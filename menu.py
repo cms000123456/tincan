@@ -18,6 +18,8 @@ class MenuOverlay:
         self.done = False
         self.note = None
         self.note_t = 0.0
+        self.slot = 0
+        self.scroll = 0
 
     def flash(self, text):
         self.note = text
@@ -102,42 +104,47 @@ class MenuOverlay:
                     self.flash(txt or "...")
                 self.mode = "items"
         elif self.mode == "equip":
+            n = len(self.game.party.members)
             if "b" in pressed:
                 self.mode = "root"
                 self.game.audio.sfx("cancel")
-            if "left" in pressed or "up" in pressed:
-                self.slot = 1 - getattr(self, "slot", 0)
+            if "left" in pressed or "right" in pressed:
+                d = 1 if "right" in pressed else -1
+                self.member_idx = (self.member_idx + d) % n
                 self.game.audio.sfx("cursor")
-            if "right" in pressed or "down" in pressed:
-                self.slot = 1 - getattr(self, "slot", 0)
+            if "up" in pressed or "down" in pressed:
+                self.slot = 1 - self.slot
                 self.game.audio.sfx("cursor")
             if "a" in pressed:
                 self.mode = "equip_list"
-                self.item_idx = 0
+                cands = self._equip_candidates()
+                m = self.game.party.members[self.member_idx]
+                cur = m.weapon if self.slot == 0 else m.charm
+                ids = [c[0] for c in cands]
+                self.item_idx = ids.index(cur) if cur else 0
+                self.scroll = 0
                 self.game.audio.sfx("confirm")
         elif self.mode == "equip_list":
             cands = self._equip_candidates()
+            n = len(cands)
             if "b" in pressed:
                 self.mode = "equip"
                 self.game.audio.sfx("cancel")
-            if cands:
-                n = len(cands)
-                if "up" in pressed:
-                    self.item_idx = (self.item_idx - 1) % n
-                    self.game.audio.sfx("cursor")
-                if "down" in pressed:
-                    self.item_idx = (self.item_idx + 1) % n
-                    self.game.audio.sfx("cursor")
-            if "a" in pressed and cands:
-                iid = cands[self.item_idx % len(cands)][0]
+            if "up" in pressed:
+                self.item_idx = (self.item_idx - 1) % n
+                self.game.audio.sfx("cursor")
+            if "down" in pressed:
+                self.item_idx = (self.item_idx + 1) % n
+                self.game.audio.sfx("cursor")
+            if "a" in pressed:
+                iid = cands[self.item_idx % n][0]
                 m2 = self.game.party.members[self.member_idx]
-                if iid == "(none)":
-                    slot = "weapon" if self.slot == 0 else "charm"
+                slot = "weapon" if self.slot == 0 else "charm"
+                if iid is None:
                     setattr(m2, slot, None)
                     self.flash("Unequipped.")
                 else:
-                    setattr(m2, "weapon" if self.slot == 0 else "charm",
-                            iid)
+                    setattr(m2, slot, iid)
                     self.flash(f"Equipped: {data.ITEMS[iid]['name']}!")
                 self.game.audio.sfx("confirm")
                 self.mode = "equip"
@@ -166,9 +173,11 @@ class MenuOverlay:
                                  else PAL["text_dim"])
             y += 46
         assets.draw_text(surf, f"Gold: {p.gold}", 48, 350, 26, PAL["amber"])
-        # party glance (right column)
-        assets.draw_panel(surf, (330, 60, 260, 320))
-        for i, m in enumerate(p.members):
+        # party glance (right column) - hidden under the big equip panel
+        glance = self.mode not in ("equip", "equip_list")
+        if glance:
+            assets.draw_panel(surf, (330, 60, 260, 320))
+        for i, m in enumerate(p.members if glance else []):
             yy = 150 + i * 80
             img = m.sheet.get(("down", "idle"))
             if img:
@@ -199,12 +208,16 @@ class MenuOverlay:
             self._equip_panel(surf)
         elif self.mode == "equip_list":
             self._equip_panel(surf)
-            self._equip_list_panel(surf)
         if self.note and self.note_t > 0:
-            rect = pygame.Rect(340, 380, 420, 44)
+            if self.mode in ("equip", "equip_list"):
+                rect = pygame.Rect(30, 392, 290, 44)     # clear of the list
+                size = 20
+            else:
+                rect = pygame.Rect(340, 380, 420, 44)
+                size = 24
             assets.draw_panel(surf, rect)
-            assets.draw_text(surf, self.note, 356, rect.y + 10, 24,
-                             PAL["amber"])
+            assets.draw_text(surf, self.note, rect.x + 14, rect.y + 11,
+                             size, PAL["amber"])
 
     def _list_panel(self, surf, title, entries):
         rect = pygame.Rect(WINW // 2 - 90, 60, 300,
@@ -289,68 +302,128 @@ class MenuOverlay:
                              PAL["text_dim"])
 
     def _equip_candidates(self):
-        m = self.game.party.members[self.member_idx]
+        """Owned gear that fits the selected member's slot, best first,
+        then a 'remove' entry. A charm worn by someone else only counts
+        if you own a spare."""
+        p = self.game.party
+        m = p.members[self.member_idx]
+        kind = "weapon" if self.slot == 0 else "charm"
         out = []
-        if self.slot == 0:
-            for iid, it in data.ITEMS.items():
-                if it["kind"] == "weapon" and it.get("for_") == m.id:
-                    out.append((iid, it))
-        else:
-            for iid, it in data.ITEMS.items():
-                if it["kind"] == "charm":
-                    out.append((iid, it))
+        for iid, it in data.ITEMS.items():
+            if it["kind"] != kind:
+                continue
+            if kind == "weapon" and it.get("for_") != m.id:
+                continue
+            mine = (m.weapon if kind == "weapon" else m.charm) == iid
+            owned = p.inventory.get(iid, 0)
+            if kind == "charm":
+                owned -= sum(1 for o in p.members
+                             if o is not m and o.charm == iid)
+            if mine or owned > 0:
+                out.append((iid, it))
         out.sort(key=lambda t: -(t[1].get("atk", 0) + t[1].get("mag", 0) +
                                  t[1].get("dfn", 0) + t[1].get("mdf", 0)))
+        out.append((None, dict(name="- remove -", desc="Take it off.")))
         return out
 
-    def _equip_panel(self, surf):
-        m = self.game.party.members[self.member_idx]
-        rect = pygame.Rect(WINW // 2 - 40, 80, 420, 300)
-        assets.draw_panel(surf, rect)
-        assets.draw_text(surf, f"EQUIP - {m.name}", rect.x + 20,
-                         rect.y + 12, 26, PAL["amber"], bold=True)
-        slots = [("Weapon", m.weapon), ("Charm", m.charm)]
-        for i, (label, iid) in enumerate(slots):
-            sel = getattr(self, "slot", 0) == i
-            col = PAL["amber"] if sel else PAL["text"]
-            if sel:
-                assets.draw_arrow(surf, rect.x + 16, rect.y + 64 + i * 60 - 2)
-            assets.draw_text(surf, label, rect.x + 38, rect.y + 60 + i * 60,
-                             24, col, bold=True)
-            nm = data.ITEMS[iid]["name"] if iid else "- none -"
-            assets.draw_text(surf, nm, rect.x + 38, rect.y + 88 + i * 60, 22)
-        cur = m.known_techs()
-        assets.draw_text(surf,
-                         f"ATK {m.atk()}  DEF {m.dfn()}  MAG {m.mag()}  "
-                         f"MDF {m.mdf()}", rect.x + 20, rect.bottom - 34, 20,
-                         PAL["text_dim"])
+    STATS = (("ATK", "atk"), ("DEF", "dfn"), ("MAG", "mag"), ("MDF", "mdf"))
 
-    def _equip_list_panel(self, surf):
-        cands = self._equip_candidates()
-        rect = pygame.Rect(WINW // 2 + 380, 120, 380, 120 + 32 * len(cands))
+    def _equip_panel(self, surf):
+        """One panel inside the screen: member, slots, stats (with a
+        preview of the highlighted item) and the scrolling gear list."""
+        p = self.game.party
+        m = p.members[self.member_idx]
+        rect = pygame.Rect(330, 40, WINW - 360, WINH - 80)
         assets.draw_panel(surf, rect)
-        assets.draw_text(surf, "choose:", rect.x + 18, rect.y + 12, 22,
-                         PAL["amber"], bold=True)
-        if not cands:
-            assets.draw_text(surf, "(nothing fits)", rect.x + 20,
-                             rect.y + 44, 20, PAL["text_dim"])
+        x0 = rect.x + 22
+        listing = self.mode == "equip_list"
+        # header: < Kai >
+        assets.draw_text(surf, "EQUIP", x0, rect.y + 14, 26, PAL["amber"],
+                         bold=True)
+        img = m.sheet.get(("down", "idle"))
+        hx = rect.right - 210
+        if img:
+            surf.blit(img, (hx, rect.y + 6))
+        assets.draw_text(surf, m.name, hx + 40, rect.y + 14, 26,
+                         PAL["text"], bold=True)
+        if not listing:
+            assets.draw_text(surf, "<", hx - 26, rect.y + 14, 26,
+                             PAL["amber"])
+            assets.draw_text(surf, ">", rect.right - 30, rect.y + 14, 26,
+                             PAL["amber"])
+        # slots
+        y = rect.y + 62
+        for i, (label, iid) in enumerate((("Weapon", m.weapon),
+                                          ("Charm", m.charm))):
+            sel = self.slot == i
+            col = PAL["amber"] if sel else PAL["text_dim"]
+            if sel and not listing:
+                assets.draw_arrow(surf, x0 - 6, y + 2)
+            assets.draw_text(surf, label, x0 + 18, y, 24, col, bold=True)
+            nm = data.ITEMS[iid]["name"] if iid else "- none -"
+            assets.draw_text(surf, nm, x0 + 140, y, 24,
+                             PAL["text"] if iid else PAL["text_dim"])
+            y += 36
+        # stats, with preview of the highlighted candidate
+        cands = self._equip_candidates() if listing else []
+        pick = cands[self.item_idx % len(cands)] if cands else None
+        slot_attr = "weapon" if self.slot == 0 else "charm"
+        y += 6
+        for k, (lab, key) in enumerate(self.STATS):
+            sx = x0 + k * ((rect.w - 44) // 4)
+            now = getattr(m, key)()
+            assets.draw_text(surf, lab, sx, y, 20, PAL["text_dim"])
+            assets.draw_text(surf, str(now), sx + 52, y, 20)
+            if pick is not None:
+                old = getattr(m, slot_attr)
+                setattr(m, slot_attr, pick[0])
+                new = getattr(m, key)()
+                setattr(m, slot_attr, old)
+                if new != now:
+                    col = PAL["green"] if new > now else PAL["red"]
+                    assets.draw_text(surf, f"{'+' if new > now else ''}"
+                                     f"{new - now}", sx + 52, y + 24, 18,
+                                     col)
+        y += 58
+        pygame.draw.line(surf, (110, 120, 190), (x0, y), (rect.right - 22, y),
+                         2)
+        y += 12
+        if not listing:
+            assets.draw_text(surf, "Left/Right: party member   "
+                             "Up/Down: slot   Z: change", x0, y, 18,
+                             PAL["text_dim"])
             return
-        for i, (iid, it) in enumerate(cands):
-            y = rect.y + 40 + i * 30
-            sel = self.item_idx % len(cands) == i
+        # scrolling list
+        rows = max(3, (rect.bottom - 60 - y) // 32)
+        idx = self.item_idx % len(cands)
+        if idx < self.scroll:
+            self.scroll = idx
+        elif idx >= self.scroll + rows:
+            self.scroll = idx - rows + 1
+        top = y
+        for i in range(self.scroll, min(len(cands), self.scroll + rows)):
+            iid, it = cands[i]
+            yy = top + (i - self.scroll) * 32
+            sel = i == idx
             if sel:
-                assets.draw_arrow(surf, rect.x + 12, y - 4)
-            bonuses = "+".join(f"{k.upper()}+{v}" for k, v in
-                               (("atk", it.get("atk", 0)), ("mag", it.get("mag", 0)),
-                                ("dfn", it.get("dfn", 0)),
-                                ("mdf", it.get("mdf", 0))) if v)
-            assets.draw_text(surf, f"{it['name']}  {bonuses}", rect.x + 34,
-                             y - 5, 20, PAL["amber"] if sel else PAL["text"])
-        cands.append(("(none)", dict(name="remove")))
-        i0 = self.item_idx % len(cands)
-        sel_it = cands[i0][1]
-        assets.draw_text(surf, sel_it.get("desc", ""), rect.x + 18,
-                         rect.bottom - 32, 20, PAL["text_dim"])
+                assets.draw_arrow(surf, x0 - 6, yy + 2)
+            worn = iid is not None and getattr(m, slot_attr) == iid
+            name = it["name"] + ("  (E)" if worn else "")
+            assets.draw_text(surf, name, x0 + 18, yy, 22,
+                             PAL["amber"] if sel else PAL["text"])
+            bon = "  ".join(f"{lab}+{it.get(key, 0)}" for lab, key in
+                            self.STATS if it.get(key, 0))
+            assets.draw_text(surf, bon, rect.right - 24, yy + 2, 18,
+                             PAL["cyan"], align="right")
+        if self.scroll > 0:
+            assets.draw_text(surf, "^", rect.centerx, top - 16, 18,
+                             PAL["amber"])
+        if self.scroll + rows < len(cands):
+            assets.draw_text(surf, "v", rect.centerx, rect.bottom - 58, 18,
+                             PAL["amber"])
+        desc = pick[1].get("desc", "") if pick else ""
+        assets.draw_text(surf, desc, x0, rect.bottom - 36, 18,
+                         PAL["text_dim"])
 
     def _quest_panel(self, surf):
         import data
