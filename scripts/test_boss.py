@@ -19,6 +19,9 @@ DT = ap.DT
 
 def run():
     g = game_mod.Game(headless=True)
+    # story scenes/cards would hold the world in "card"/"dialog" state
+    g.flags.update({sc["id"]: True for scs in data.SCENES.values()
+                    for sc in scs})
     dr = ap.Driver(g)
     dr.step(5)
     dr.step(1, {"a"})
