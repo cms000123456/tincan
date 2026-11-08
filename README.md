@@ -31,9 +31,11 @@ There is **no build step**. Rendered songs are cached in
 
 <p align="center"><img src="docs/collage.png" alt="Ten chapters of towns, fields, dungeons and battles" width="100%"></p>
 
-| Side-view battles | Boss fights | Story dialogue |
+| Side-view battles | Boss fights | Chapter cards |
 |:---:|:---:|:---:|
-| <img src="docs/battle.png" width="300"> | <img src="docs/boss.png" width="300"> | <img src="docs/dialogue.png" width="300"> |
+| <img src="docs/battle.png" width="300"> | <img src="docs/boss.png" width="300"> | <img src="docs/chapter_card.png" width="300"> |
+| **Story scenes** | **Thornwood** | **Gearhaven** |
+| <img src="docs/dialogue.png" width="300"> | <img src="docs/thorn_town.png" width="300"> | <img src="docs/gear_town.png" width="300"> |
 | **Cinderhollow** | **The Rust Dunes** | **The Astral Orrery** |
 | <img src="docs/town.png" width="300"> | <img src="docs/dunes_field.png" width="300"> | <img src="docs/orrery.png" width="300"> |
 
@@ -48,6 +50,24 @@ Rime Colossus and Archon Prime. Act II (chapters 5-10, built in
 Thornwood, the Ashen Slopes, Mirror Marsh and Gearhaven - each with a town,
 a field, a four-floor dungeon, a boss and four side quests, then the
 six-floor Astral Orrery and the Clockmaker.
+
+After Archon Prime falls, a masked figure appears over Emberport's
+harbour: **the Clockmaker**, who needs five Star Gears to make his Orrery
+chime and stop time. Each Star Gear holds a memory of his. Seen one after
+another, they show a grieving father, the daughter he lost, and an
+apprentice from Cinderhollow who left home thirty years ago.
+
+The hand-written script lives in `story.py`:
+
+- **Chapter title cards** that sweep in at the start of each chapter.
+- **One-shot scenes** for arriving in each region, town and dungeon, and
+  after each boss.
+- **Leaders and townsfolk:** a voice of its own for every Act II town
+  leader, plus two named townsfolk per town whose lines change once their
+  region is saved.
+
+Dialogue shows the speaker's name on a nameplate, and party members get a
+portrait.
 
 `scripts/playthrough.py` plays the whole story through key presses; a full
 run takes about 3h20m of bot play (a first-time human player: roughly

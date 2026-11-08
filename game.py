@@ -474,10 +474,18 @@ class EndingScene(Scene):
         "The Astral Orrery shudders, and its great rings fall still.",
         "",
         "Five Star Gears go dark. The Clockmaker's mask cracks,",
-        "and beneath it is only an old, tired tinkerer",
+        "and beneath it is only Orlo Venn - an old, tired tinkerer",
         "who wanted to stop time before it took everything he loved.",
         "",
-        "Kai, Nara and Vela carry him home to Cinderhollow.",
+        "Nara opens the yellowed letter and reads it aloud:",
+        "'Papa - come home soon. Don't be sad if I'm sleeping.",
+        "Clocks are for counting good days, not stopping them.",
+        "Love, Lira.'",
+        "",
+        "Orlo weeps for a long time. Then he asks to go home.",
+        "",
+        "Kai, Nara and Vela bring him back to Cinderhollow,",
+        "where Elder Bram is waiting at the gate with the kettle on.",
         "The mountain hums softly again - a kinder sort of hum.",
         "",
         "In Duneholm the sand stops ticking.",
@@ -668,10 +676,45 @@ class WorldScene(Scene):
             game.audio.play_music(self.world.music)
 
     # -- helpers -----------------------------------------------------------------
-    def show_dialog(self, pages, on_finish=None):
+    def show_dialog(self, pages, on_finish=None, speakers=True):
         self.state = "dialog"
         self.overlay = dialogue.DialogueBox(self.game, pages,
-                                            on_finish=on_finish)
+                                            on_finish=on_finish,
+                                            speakers=speakers)
+
+    # -- one-shot story scenes (story.SCENES) ---------------------------------
+    def _check_scenes(self):
+        """Play the first pending scene for this map, if any."""
+        w = self.world
+        key = (w.map_id, len(self.game.flags),
+               len(self.game.party.inventory))
+        if key == getattr(self, "_scene_key", None):
+            return False
+        self._scene_key = key
+        flags = self.game.flags
+        for sc in getattr(data, "SCENES", {}).get(w.map_id, []):
+            if sc["id"] in flags:
+                continue
+            if sc.get("req") is not None and self._match_dialog(
+                    [dict(req=sc["req"], lines=[])]) is None:
+                continue
+            flags[sc["id"]] = True
+            lines = list(sc.get("lines", []))
+            for f in sc.get("set", []):
+                flags[f] = True
+
+            def talk(lines=lines):
+                if lines:
+                    self.show_dialog(lines)
+            if sc.get("card"):
+                num, title = sc["card"]
+                self.state = "card"
+                self.overlay = dialogue.ChapterCard(self.game, num, title,
+                                                    on_finish=talk)
+            else:
+                talk()
+            return True
+        return False
 
     def begin_transition(self, to_map, tx, ty, face):
         self.pending_exit = (to_map, tx, ty, face)
@@ -713,7 +756,7 @@ class WorldScene(Scene):
                 opened[obj["id"]] = True
                 self._give_chest(obj)
         elif kind == "sign":
-            self.show_dialog(list(obj))
+            self.show_dialog(list(obj), speakers=False)
         elif kind == "crystal":
             p = self.game.party
             for m in p.members:
@@ -890,6 +933,9 @@ class WorldScene(Scene):
     # -- update ---------------------------------------------------------------
     def update(self, dt, pressed, held):
         w = self.world
+        if self.state == "play" and not w.walker.moving and \
+                self._check_scenes():
+            return
         if self.state == "play":
             self._update_play(dt, pressed, held)
             w.walker.update(dt, w)
@@ -910,6 +956,12 @@ class WorldScene(Scene):
                     if abs(mo.x - w.walker.gx) + abs(mo.y - w.walker.gy) <= 1:
                         self.game.start_entity_battle(self, mo)
                         return
+        elif self.state == "card":
+            ov = self.overlay
+            ov.update(dt, pressed)
+            if ov.done and self.overlay is ov:
+                self.overlay = None
+                self.state = "play"
         elif self.state == "dialog":
             self.overlay.update(dt, pressed)
             if getattr(self.overlay, "done", False) and \
@@ -1029,7 +1081,8 @@ class WorldScene(Scene):
         surf.blit(pygame.transform.scale(low, (WINW, WINH)), (0, 0))
         # overlays
         if self.overlay is not None and self.state in ("dialog", "shop",
-                                                       "menu", "choice"):
+                                                       "menu", "choice",
+                                                       "card"):
             self.overlay.draw(surf)
         if self.fade:
             _, t = self.fade

@@ -1338,4 +1338,6 @@ def _decorate_maps():
 
 import chapters  # noqa: E402  (Act II content, built from mapgen)
 chapters.install(globals())
+import story  # noqa: E402
+story.apply(globals())
 _decorate_maps()

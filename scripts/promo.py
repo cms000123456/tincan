@@ -134,6 +134,8 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     random.seed(7)
     g = game_mod.Game(headless=True)
+    seen = {sc["id"]: True for scs in data.SCENES.values() for sc in scs}
+    g.flags.update(seen)            # no cutscenes over the screenshots
     shots = []
     # title
     steps(g, 200)
@@ -142,8 +144,8 @@ def main():
     world_shot(g, "town", "town", 15, 10, "down", walk=[("down", 12)])
     shots.append(os.path.join(OUT, "town.png"))
     world_shot(g, "dialogue", "town", 15, 10, "down", dialog=[
-        "Elder Bram: The mountain has stopped humming. "
-        "*Something in the Cavern of Cogs* is awake."])
+        "Nara: The mountain has stopped humming. *Something in the "
+        "Cavern of Cogs* is awake - and it's calling for us."])
     world_shot(g, "overworld", "overworld", 24, 9, "up",
                walk=[("up", 18)])
     shots.append(os.path.join(OUT, "overworld.png"))
@@ -164,6 +166,13 @@ def main():
     level_party(g, 30)
     battle_shot(g, "boss", ["forge_titan"], boss=True, frames=200, dmg=0.2)
     shots.append(os.path.join(OUT, "boss.png"))
+    # chapter title card, mid-sweep
+    g.flags.pop("sc_card8", None)
+    x, y = arrival("marsh_field")
+    g.start_world("marsh_field", x, y, "up")
+    steps(g, 95)
+    save(g, "chapter_card")
+    g.flags["sc_card8"] = True
     x, y = arrival("orrery_1")
     world_shot(g, "orrery", "orrery_1", x, y, "up", walk=[("up", 50)])
     shots.append(os.path.join(OUT, "orrery.png"))
