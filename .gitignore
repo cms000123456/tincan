@@ -4,3 +4,4 @@ __pycache__/
 *.json.bak
 .tincan_chronicles_save.json
 docs/.promo_save
+docs/music/

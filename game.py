@@ -258,7 +258,7 @@ class Game:
                 if ent.on_defeat == "game_clear":
                     self.battle_scene = None
                     self.scene = EndingScene(self)
-                    self.audio.play_music("sky")
+                    self.audio.play_music("ending")
                     return
         self.battle_scene = None
         self.scene = self.world_scene
@@ -327,7 +327,7 @@ class TitleScene(Scene):
         self.opt_idx = 0
         self.t = 0.0
         self.gameover = game_over
-        game.audio.play_music("town")
+        game.audio.play_music("title")
         self.backdrop = TitleScene._backdrop()
 
     _bd_cache = []

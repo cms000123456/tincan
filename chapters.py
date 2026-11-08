@@ -515,7 +515,7 @@ def install(D):
                                       f"Merchant: Finest goods in "
                                       f"{c['region']}. Have a look!"])])
                 MAPS[iid] = dict(name=f"{c['town']} {kind.title()}",
-                                 fill="W", music=c["music"],
+                                 fill="W", music=c["music"] + "_town",
                                  encounters=None,
                                  exits=[dict(x=7, y=8, to=tid, tx=dx,
                                              ty=by + 2, face="down")],
@@ -650,7 +650,8 @@ def install(D):
             if trows[n["y"]][n["x"]] not in "#.amzy":
                 _put(trows, n["x"], n["y"], g)
         D[tid.upper()] = trows
-        MAPS[tid] = dict(name=c["town"], fill="T", music=c["music"],
+        MAPS[tid] = dict(name=c["town"], fill="T",
+                         music=c["music"] + "_town",
                          house=c["house"],
                          encounters=None, exits=texits,
                          signs={(tgate[0] + 2, tgate[1] - 2):
@@ -711,7 +712,7 @@ def install(D):
                 crystals.append((stair[0] - 3, stair[1] + 4))
             crystals = _floor_only(rows, crystals, spots)
             MAPS[mid] = dict(name=f"{c['dungeon']} {fl}F", fill="C",
-                             music="cavern" if fl < FLOORS else "vault",
+                             music="ruins" if fl < FLOORS else "lair",
                              encounters=enc_dun, enc_tile="_",
                              exits=exits, signs={}, npcs=[], chests=chests,
                              crystals=crystals, entities=[], floor=c["floor"],

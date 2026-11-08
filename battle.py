@@ -150,8 +150,12 @@ class BattleScene:
         self.victory_idx = 0
         self.gameover = False
         self.result = None
-        self.music = "battle"
-        self.audio.play_music("battle")
+        if self.is_boss:
+            self.music = "boss"
+        else:                       # alternate two themes for variety
+            BattleScene._n = getattr(BattleScene, "_n", 0) + 1
+            self.music = ("battle", "battle2")[BattleScene._n % 2]
+        self.audio.play_music(self.music)
         self.audio.sfx("encounter")
         self.bg = self._make_bg()
         intro = None
@@ -816,7 +820,7 @@ class BattleScene:
         self.phase = "victory"
         self._close_command()
         self.audio.stop_music()
-        self.audio.sfx("save")
+        self.audio.sfx("fanfare")
         exp = sum(a.ref["exp"] for a in self.actors_e)
         gold = sum(a.ref["gold"] for a in self.actors_e)
         msgs = ["** VICTORY! **"]

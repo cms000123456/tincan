@@ -21,8 +21,21 @@ Art comes from three places:
   in `audio.py`) is generated in code. If an `input/` image is missing the
   game falls back to a procedural version.
 
-There is **no build step**. Rendered songs are cached in
-`~/.cache/tincan_chronicles/audio/` (delete it to force a re-render).
+**Music is composed in code** (`audio.py`): 27 songs, about 48 minutes in
+total. Each song has its own key, mode, tempo, instruments and chord
+progressions. The composer writes motif-based melodies and arranges them
+through verses, contrasting sections, a breakdown and reprises with new
+instruments, harmony and drum fills, so a song runs 1–2 minutes before it
+loops.
+
+There are title, boss and ending themes, two alternating battle themes,
+and an overworld and a town theme for every region.
+`scripts/music_preview.py` exports them all as WAV files to `docs/music/`.
+
+There is **no build step**. Songs render in the background on first launch
+(about 80 s for all of them) and are cached in
+`~/.cache/tincan_chronicles/audio/`; delete that folder to force a
+re-render.
 
 ![features](https://img.shields.io/badge/genre-J--RPG-blue) · runs on **Linux** &
 **Windows** · single window, 960×528 · saves to `~/.tincan_chronicles_save.json`
