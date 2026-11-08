@@ -1,0 +1,5 @@
+.venv/
+__pycache__/
+*.pyc
+*.json.bak
+.tincan_chronicles_save.json
