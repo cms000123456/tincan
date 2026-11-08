@@ -893,6 +893,13 @@ class WorldScene(Scene):
         if self.state == "play":
             self._update_play(dt, pressed, held)
             w.walker.update(dt, w)
+            # chain straight into the next step while a direction is held,
+            # so walking never drops a frame back to the idle pose
+            if self.state == "play" and not w.walker.moving and \
+                    w.walker.carry > 0 and w is self.world:
+                self._try_walk(held)
+                if not w.walker.moving:
+                    w.walker.carry = 0.0
             for n in w.npcs:
                 n.update(dt, w)
             for mo in w.monsters:
@@ -981,6 +988,11 @@ class WorldScene(Scene):
             walker.moving = False
             self.interact()
             return
+        self._try_walk(held)
+
+    def _try_walk(self, held):
+        w = self.world
+        walker = w.walker
         dirs = []
         if "up" in held:
             dirs.append((0, -1))
@@ -1026,9 +1038,13 @@ class WorldScene(Scene):
             ov.fill((0, 0, 0))
             ov.set_alpha(a)
             surf.blit(ov, (0, 0))
-        if self.state == "battle_fade":
+        if self.state in ("battle_fade", "battle_hold"):
+            # SNES battle swirl: white flash, mosaic break-up, blinds close
             t = self.battle_fade_t
-            a = int(255 * min(1, t / 0.3))
-            ov = pygame.Surface((WINW, WINH), pygame.SRCALPHA)
-            ov.fill((255, 255, 255, min(230, a)))
-            surf.blit(ov, (0, 0))
+            if t < 0.12:
+                ov = pygame.Surface((WINW, WINH), pygame.SRCALPHA)
+                ov.fill((255, 255, 255, int(200 * (1 - t / 0.12))))
+                surf.blit(ov, (0, 0))
+            f = min(1.0, t / 0.55)
+            assets.mosaic(surf, 1 + f * f * 28)
+            assets.blinds(surf, max(0.0, (f - 0.35) / 0.65))

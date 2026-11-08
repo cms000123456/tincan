@@ -44,8 +44,25 @@ class NPC:
         self.shop = d.get("shop", False)
         self.inn = int(d.get("inn", 0))
         self.timer = random.random() * 2.0
+        self.walk_t = 0.0
+
+    def glide(self, dt):
+        """Slide the drawn position toward the logical tile."""
+        tx, ty = self.x * TILE, self.y * TILE
+        sp = TILE / 0.28 * dt
+        moving = (self.px, self.py) != (tx, ty)
+        self.px += max(-sp, min(sp, tx - self.px))
+        self.py += max(-sp, min(sp, ty - self.py))
+        self.walk_t = self.walk_t + dt if moving else 0.0
+        return moving
+
+    def frame(self):
+        if self.walk_t <= 0:
+            return "idle"
+        return ("a", "idle", "b", "idle")[int(self.walk_t / 0.07) % 4]
 
     def update(self, dt, world):
+        self.glide(dt)
         if self.wander <= 0:
             return
         self.timer -= dt
@@ -78,8 +95,13 @@ class Monster:
         self.require = d.get("require")
         self.timer = random.random() * 2.0
         self.bob = random.random() * 6.0
+        self.px, self.py = self.x * TILE, self.y * TILE
 
     def update(self, dt, world):
+        tx, ty = self.x * TILE, self.y * TILE
+        sp = TILE / 0.3 * dt
+        self.px += max(-sp, min(sp, tx - self.px))
+        self.py += max(-sp, min(sp, ty - self.py))
         if self.wander <= 0:
             return
         self.timer -= dt
@@ -107,6 +129,7 @@ class PartyWalker:
         self.moving = False
         self.tx, self.ty = x, y
         self.progress = 0.0
+        self.carry = 0.0                # overshoot carried into next step
         self.duration = STEP_SECONDS
         self.history = deque(maxlen=FOLLOWER_GAP * 5)
         self.step_count = 0
@@ -122,7 +145,7 @@ class PartyWalker:
     def begin_step(self, dx, dy):
         self.tx, self.ty = self.gx + dx, self.gy + dy
         self.moving = True
-        self.progress = 0.0
+        self.progress, self.carry = self.carry, 0.0
         self.step_count += 1
         self.face = "right" if dx > 0 else "left" if dx < 0 else \
             "down" if dy > 0 else "up"
@@ -134,6 +157,7 @@ class PartyWalker:
         if self.moving:
             self.progress += dt / self.duration
             if self.progress >= 1.0:
+                self.carry = min(0.9, self.progress - 1.0)
                 self.gx, self.gy = self.tx, self.ty
                 self.px, self.py = self.gx * TILE, self.gy * TILE
                 self.moving = False
@@ -148,7 +172,9 @@ class PartyWalker:
     def anim_frame(self):
         if not self.moving:
             return "idle"
-        return "a" if (int(self.progress * 2) % 2 == 0) else "b"
+        # SNES-style cycle over two tiles: left foot, stand, right, stand
+        return ("a", "idle", "b", "idle")[(self.step_count * 2 +
+                                          int(self.progress * 2)) % 4]
 
     def draw(self, surf, ox, oy, frame):
         img = self.sheets[(self.face, frame)]
@@ -775,9 +801,9 @@ class World:
             px, py, face = w.follower_pos(i - 1)
             surf.blit(sh, (px - ox, py + 10 - oy))
         for n in self.npcs:
-            surf.blit(sh, (n.x * TILE - ox, n.y * TILE + 10 - oy))
+            surf.blit(sh, (int(n.px) - ox, int(n.py) + 10 - oy))
         for mo in self.monsters:
-            surf.blit(sh, (mo.x * TILE - ox, mo.y * TILE + 8 - oy))
+            surf.blit(sh, (int(mo.px) - ox, int(mo.py) + 8 - oy))
 
         # y-sorted sprites
         drawables = []
@@ -799,13 +825,16 @@ class World:
                                               img.get_height() + 1 - oy))))
         for n in self.npcs:
             sheet = self.sheets["npc_" + n.id]
-            img = sheet[(n.face, "idle")]
-            drawables.append((n.y * TILE + 12,
-                              lambda img=img, n=n, ox=ox, oy=oy:
-                              surf.blit(img, feet_pos(img, n.x * TILE - ox,
-                                                      n.y * TILE + 1 - oy))))
+            fr = n.frame()
+            img = sheet.get((n.face, fr)) or sheet[(n.face, "idle")]
+            bob = -1 if fr == "a" else 0
+            drawables.append((int(n.py) + 12,
+                              lambda img=img, n=n, ox=ox, oy=oy, bob=bob:
+                              surf.blit(img, feet_pos(img, int(n.px) - ox,
+                                                      int(n.py) + 1 + bob -
+                                                      oy))))
         for mo in self.monsters:
-            drawables.append((mo.y * TILE + 12,
+            drawables.append((int(mo.py) + 12,
                               lambda mo=mo, ox=ox, oy=oy:
                               self._draw_monster(surf, t, mo, ox, oy)))
         # world objects (trees, rocks...) and buildings, y-sorted with actors
@@ -865,5 +894,5 @@ class World:
             img = spr
         mo.bob += 0.05
         off = int(1.5 * (mo.bob % 2))
-        surf.blit(img, (mo.x * TILE + (TILE - img.get_width()) // 2 - ox,
-                        mo.y * TILE + 16 - img.get_height() - 4 + off - oy))
+        surf.blit(img, (int(mo.px) + (TILE - img.get_width()) // 2 - ox,
+                        int(mo.py) + 16 - img.get_height() - 4 + off - oy))

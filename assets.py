@@ -1247,3 +1247,33 @@ def load_assets():
     return {"tiles": tiles, "anim": anim, "props": props, "enemies": enemies,
             "enemies_battle": enemies_battle, "var": var, "over": over,
             "objects": sprites.world_objects(), "tex": sprites.textures()}
+
+
+
+def mosaic(surf, block, rect=None):
+    """SNES-style mosaic: pixelate surf in place with square blocks."""
+    import pygame as _pg
+    block = int(block)
+    if block <= 1:
+        return
+    r = _pg.Rect(rect) if rect else surf.get_rect()
+    sub = surf.subsurface(r)
+    small = _pg.transform.scale(sub, (max(1, r.w // block),
+                                      max(1, r.h // block)))
+    surf.blit(_pg.transform.scale(small, r.size), r.topleft)
+
+
+def blinds(surf, f, color=(0, 0, 0), bars=12):
+    """Venetian-blind wipe: f=0 open, f=1 fully closed. Bars alternate
+    direction so it reads as a swirl on the scaled screen."""
+    import pygame as _pg
+    if f <= 0:
+        return
+    w, h = surf.get_size()
+    bh = h / bars
+    for i in range(bars):
+        y0 = int(i * bh)
+        y1 = int((i + 1) * bh)
+        cw = int(w * min(1.0, f))
+        x = 0 if i % 2 == 0 else w - cw
+        _pg.draw.rect(surf, color, (x, y0, cw, y1 - y0))

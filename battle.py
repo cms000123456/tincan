@@ -857,6 +857,15 @@ class BattleScene:
 
     # -- drawing --------------------------------------------------------------------
     def draw(self, surf):
+        self._draw_body(surf)
+        if self.phase == "intro":
+            t = getattr(self, "t_reset", 0.0)
+            f = 1.0 - min(1.0, t / 0.45)          # 1 -> 0 over the reveal
+            if f > 0:
+                assets.mosaic(surf, 1 + f * f * 30)
+                assets.blinds(surf, f * 1.2)
+
+    def _draw_body(self, surf):
         sh = self.shake
         ox = random.randint(-6, 6) if sh > 0 else 0
         oy = random.randint(-4, 4) if sh > 0 else 0

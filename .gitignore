@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 *.json.bak
 .tincan_chronicles_save.json
+docs/.promo_save

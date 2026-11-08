@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/banner.png" alt="Tin Can Chronicles" width="100%"></p>
+
 # Tin Can Chronicles
 
 A tiny **Chrono Trigger–style JRPG** in Python + Pygame, presented in a
@@ -24,6 +26,19 @@ There is **no build step**. Rendered songs are cached in
 
 ![features](https://img.shields.io/badge/genre-J--RPG-blue) · runs on **Linux** &
 **Windows** · single window, 960×528 · saves to `~/.tincan_chronicles_save.json`
+
+## Screenshots
+
+<p align="center"><img src="docs/collage.png" alt="Ten chapters of towns, fields, dungeons and battles" width="100%"></p>
+
+| Side-view battles | Boss fights | Story dialogue |
+|:---:|:---:|:---:|
+| <img src="docs/battle.png" width="300"> | <img src="docs/boss.png" width="300"> | <img src="docs/dialogue.png" width="300"> |
+| **Cinderhollow** | **The Rust Dunes** | **The Astral Orrery** |
+| <img src="docs/town.png" width="300"> | <img src="docs/dunes_field.png" width="300"> | <img src="docs/orrery.png" width="300"> |
+
+Screenshots are rendered from the real game by `scripts/promo.py`
+(re-run it after art changes).
 
 ## Story & length
 
